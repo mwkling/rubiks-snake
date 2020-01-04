@@ -97,9 +97,14 @@ function updateAllWorlds() {
 
 function animate() {
     requestAnimationFrame( animate );
+
+    // Updates controls when animating
+    for (var i in gui.__controllers) {
+        gui.__controllers[i].updateDisplay();
+    }
+
     renderer.render( scene, camera );
 }
-animate();
 
 window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
@@ -107,34 +112,24 @@ window.addEventListener('resize', function () {
     renderer.setSize( window.innerWidth, window.innerHeight );
 }, false );
 
-let angles = {
-    angle1: 0,
-    angle2: 0,
-    angle3: 0,
-    angle4: 0,
-    angle5: 0,
-    angle6: 0,
-    angle7: 0,
-    angle8: 0,
-    angle9: 0,
-    angle10: 0,
-    angle11: 0,
-    angle12: 0,
-    angle13: 0,
-    angle14: 0,
-    angle15: 0,
-    angle16: 0,
-    angle17: 0,
-    angle18: 0,
-    angle19: 0,
-    angle20: 0,
-    angle21: 0,
-    angle22: 0,
-    angle23: 0
+function genAngles(s) {
+    let i = 1;
+    let angles = {};
+    while(i < 24) {
+        let angle = PI / 2 * parseInt(s[i-1]);
+        if(angle > PI) {
+            angle = angle - 2 * PI;
+        }
+        angles["angle" + i] = angle;
+        i = i + 1;
+    }
+    return angles;
 }
 
+let currentAngles = genAngles("00000000000000000000000");
+
 let oldAngles = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
-function redrawSnake(angle) {
+function redrawSnake() {
     let rotationPoint = new THREE.Vector3(3 * RAD2 / 4, RAD2 / 4, 0.5);
     updateAllWorlds();
 
@@ -142,7 +137,7 @@ function redrawSnake(angle) {
     while(triCount < 24) {
         updateAllWorlds();
         // If particular angle didn't change, don't rotate
-        if(oldAngles[triCount] == angles["angle" + triCount]) {
+        if(oldAngles[triCount] == currentAngles["angle" + triCount]) {
             triCount = triCount + 1;
             continue;
         }
@@ -157,11 +152,11 @@ function redrawSnake(angle) {
         let pivot_inv = new THREE.Matrix4().getInverse(pivot_matrix, false);
         let desiredTransform;
         if(triCount % 2 == 1) {
-            desiredTransform = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(RAD2 / 2, RAD2 / 2, 0), angles["angle" + triCount] - oldAngles[triCount]);
+            desiredTransform = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(RAD2 / 2, RAD2 / 2, 0), currentAngles["angle" + triCount] - oldAngles[triCount]);
         } else {
-            desiredTransform = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(RAD2 / 2, -1 * RAD2 / 2, 0), angles["angle" + triCount] - oldAngles[triCount]);
+            desiredTransform = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(RAD2 / 2, -1 * RAD2 / 2, 0), currentAngles["angle" + triCount] - oldAngles[triCount]);
         }
-        oldAngles[triCount] = angles["angle" + triCount];
+        oldAngles[triCount] = currentAngles["angle" + triCount];
 
         count = Math.floor((triCount + 1)/ 2);
         while(count < 12) {
@@ -189,27 +184,67 @@ function redrawSnake(angle) {
     }
 }
 
-let gui = new dat.GUI();
-gui.add(angles, 'angle1', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle2', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle3', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle4', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle5', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle6', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle7', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle8', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle9', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle10', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle11', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle12', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle13', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle14', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle15', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle16', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle17', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle18', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle19', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle20', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle21', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle22', -1 * PI, PI).onChange(redrawSnake);
-gui.add(angles, 'angle23', -1 * PI, PI).onChange(redrawSnake);
+let gui = new dat.GUI({ load: getPresetJSON(), preset: 'Default'});
+gui.remember(currentAngles);
+
+function getPresetJSON() {
+    return {
+        "preset": "Default",
+        "closed": false,
+        "remembered": {
+            "Default": {
+                "0": genAngles("00000000000000000000000")
+            },
+            "Cat": {
+                "0": genAngles("02202201022022022000000")
+            },
+            "Three Peaks": {
+                "0": genAngles("10012321211233232123003")
+            },
+            "ZigZag": {
+                "0": genAngles("11111111111111111111111")
+            },
+            "Triangle": {
+                "0": genAngles("30000001300000013000000")
+            },
+            "Ball": {
+                "0": genAngles("13133131131331311313313")
+            }
+        },
+        folders: {}
+    };
+}
+
+count = 1;
+while(count < 24) {
+    gui.add(currentAngles, "angle" + count, -1 * PI, PI).step(PI/2).onChange(redrawSnake);
+    count = count + 1;
+}
+
+function buildAnimate() {
+    let animateGoal = Object.assign({}, currentAngles);
+
+    // Reset to a straight line
+    count = 1;
+    while(count < 24) {
+        currentAngles["angle" + count] = 0;
+        count = count + 1;
+    }
+
+    redrawSnake();
+    setTimeout(animateHelper.bind(null, animateGoal, 1), 300);
+}
+
+function animateHelper(goal, count) {
+    while(currentAngles["angle" + count] == goal["angle" + count] && count <= 23) {
+        count = count + 1;
+    }
+    currentAngles["angle" + count] = goal["angle" + count];
+
+    redrawSnake();
+    if(count < 23) {
+        setTimeout(animateHelper.bind(null, goal, count + 1), 300);
+    }
+}
+
+animate();
