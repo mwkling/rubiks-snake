@@ -5,10 +5,9 @@ let scene = new THREE.Scene();
 
 // Setup camera
 let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-camera.position.z = 5;
+camera.position.z = 15;
 camera.position.y = 0;
 camera.position.x = 6 * RAD2;
-camera.lookAt(6 * RAD2, 0, 0);
 
 // Setup lights
 let lights = [];
@@ -29,6 +28,7 @@ let renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
 controls = new THREE.OrbitControls( camera, renderer.domElement );
+controls.target = new THREE.Vector3(6 * RAD2, 0, 0);
 
 // Build the Snake
 let blues = [];
@@ -103,6 +103,7 @@ function animate() {
         gui.__controllers[i].updateDisplay();
     }
 
+    controls.update();
     renderer.render( scene, camera );
 }
 
@@ -220,6 +221,15 @@ while(count < 24) {
     gui.add(currentAngles, "angle" + count, -1 * PI, PI).step(PI/2).onChange(redrawSnake);
     count = count + 1;
 }
+
+function colorChange(material, newColor) {
+    material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
+}
+
+gui.add(controls, "autoRotate");
+let colorHolder = {"color1": {"r": 0x15, "g": 0x62, "b": 0x89}, "color2": {"r": 0xFF, "g": 0, "b": 0}};
+gui.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
+gui.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
 
 function buildAnimate() {
     let animateGoal = Object.assign({}, currentAngles);
