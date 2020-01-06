@@ -3,32 +3,41 @@ const PI   = Math.PI;
 
 let scene = new THREE.Scene();
 
-// Setup camera
+// Setup camera, renderer, controls
 let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
 camera.position.z = 15;
 camera.position.y = 0;
 camera.position.x = 6 * RAD2;
 
-// Setup lights
-let lights = [];
-lights[ 0 ] = new THREE.PointLight( 0xffffff, 1, 0 );
-lights[ 1 ] = new THREE.PointLight( 0xffffff, 1, 0 );
-lights[ 2 ] = new THREE.PointLight( 0xffffff, 1, 0 );
-
-lights[ 0 ].position.set( 0, 200, 0 );
-lights[ 1 ].position.set( 100, 200, 100 );
-lights[ 2 ].position.set( - 100, - 200, - 100 );
-
-scene.add( lights[ 0 ] );
-scene.add( lights[ 1 ] );
-scene.add( lights[ 2 ] );
-
-// Renderer/controls
 let renderer = new THREE.WebGLRenderer();
 renderer.setSize( window.innerWidth, window.innerHeight );
 document.body.appendChild( renderer.domElement );
-controls = new THREE.OrbitControls( camera, renderer.domElement );
+
+let controls = new THREE.OrbitControls( camera, renderer.domElement );
 controls.target = new THREE.Vector3(6 * RAD2, 0, 0);
+
+// Update the camera when window resizes
+window.addEventListener('resize', function () {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize( window.innerWidth, window.innerHeight );
+}, false );
+
+// Add lights
+(function setupLights() {
+    let lights = [];
+    lights[ 0 ] = new THREE.PointLight( 0xffffff, 1, 0 );
+    lights[ 1 ] = new THREE.PointLight( 0xffffff, 1, 0 );
+    lights[ 2 ] = new THREE.PointLight( 0xffffff, 1, 0 );
+
+    lights[ 0 ].position.set( 0, 200, 0 );
+    lights[ 1 ].position.set( 100, 200, 100 );
+    lights[ 2 ].position.set( - 100, - 200, - 100 );
+
+    scene.add( lights[ 0 ] );
+    scene.add( lights[ 1 ] );
+    scene.add( lights[ 2 ] );
+})();
 
 // Build the Snake
 function buildBlocks(shape, material, offset) {
@@ -45,17 +54,16 @@ function buildBlocks(shape, material, offset) {
     scene.add(mesh);
     blocks.push(mesh);
 
-    let count = 1;
-    while(count < 12) {
+    for(let i = 1; i < 12; i++) {
         let newMesh = mesh.clone();
-        newMesh.position.set(RAD2 * count + offset, 0, 0);
+        newMesh.position.set(RAD2 * i + offset, 0, 0);
         scene.add(newMesh);
         blocks.push(newMesh);
-        count = count + 1;
     }
     return blocks;
 }
 
+// First, add the lower 'blue' set of triangular blocks
 let blueMaterial = new THREE.MeshPhongMaterial( { color: 0x156289,
     emissive: 0x072534, side: THREE.DoubleSide, flatShading: true } );
 
@@ -66,6 +74,7 @@ shape.lineTo( RAD2 / 2, RAD2 / 2);
 shape.lineTo( 0, 0 );
 let blues = buildBlocks(shape, blueMaterial, 0);
 
+// Second, add the upper 'red' set of triangular blocks
 let redMaterial = new THREE.MeshPhongMaterial( { color: 0xFF0000,
     emissive: 0x072534, side: THREE.DoubleSide, flatShading: true } );
 
@@ -76,6 +85,19 @@ shape.lineTo( RAD2 / 2, 0);
 shape.lineTo( 0, RAD2 / 2 );
 let reds = buildBlocks(shape, redMaterial, RAD2 / 2);
 
+// Converts a string into a json object containing angles
+function genAngles(s) {
+    let angles = {};
+    for(let i = 1; i < 24; i++) {
+        let angle = PI / 2 * parseInt(s[i-1]);
+        if(angle > PI) {
+            angle = angle - 2 * PI;
+        }
+        angles["angle" + i] = angle;
+    }
+    return angles;
+}
+
 function updateAllWorlds() {
     for(const t of blues) {
         t.updateMatrixWorld(true);
@@ -85,39 +107,18 @@ function updateAllWorlds() {
     }
 }
 
-window.addEventListener('resize', function () {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize( window.innerWidth, window.innerHeight );
-}, false );
-
-function genAngles(s) {
-    let i = 1;
-    let angles = {};
-    while(i < 24) {
-        let angle = PI / 2 * parseInt(s[i-1]);
-        if(angle > PI) {
-            angle = angle - 2 * PI;
-        }
-        angles["angle" + i] = angle;
-        i = i + 1;
-    }
-    return angles;
-}
-
+// Initial position is a line (all angles are 0)
 let currentAngles = genAngles("00000000000000000000000");
+let prevAngles = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 
-let oldAngles = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 function redrawSnake() {
     let rotationPoint = new THREE.Vector3(3 * RAD2 / 4, RAD2 / 4, 0.5);
 
-    let triCount = 1;
-    while(triCount < 24) {
+    for(let triCount = 1; triCount < 24; triCount++) {
         // Without this, the world matrices don't get updated and the rotations are messed up
         updateAllWorlds();
         // If particular angle didn't change, don't rotate
-        if(oldAngles[triCount] == currentAngles["angle" + triCount]) {
-            triCount = triCount + 1;
+        if(prevAngles[triCount] == currentAngles["angle" + triCount]) {
             continue;
         }
 
@@ -135,27 +136,26 @@ function redrawSnake() {
         let pivotMatrix = mesh.matrixWorld.clone();
         let invPivotMatrix = new THREE.Matrix4().getInverse(pivotMatrix, false);
 
-        let rotationAngle = currentAngles["angle" + triCount] - oldAngles[triCount];
+        // TODO: consider the fundamental approach here.  Essentially we're always looking
+        // at changes in the angles from prior values.  Maybe floating point rounding
+        // errors could accumulate after a series of movements.
+        let rotationAngle = currentAngles["angle" + triCount] - prevAngles[triCount];
         let rotationMatrix = new THREE.Matrix4().makeRotationAxis(rotationVector, rotationAngle);
-        oldAngles[triCount] = currentAngles["angle" + triCount];
+        prevAngles[triCount] = currentAngles["angle" + triCount];
 
         function transformAfter(list, idx) {
-            while(idx < 12) {
+            for(; idx < 12; idx++) {
                 let block = list[idx];
                 block.applyMatrix(invPivotMatrix);
                 block.position.sub(rotationPoint);
                 block.applyMatrix(rotationMatrix);
                 block.position.add(rotationPoint);
                 block.applyMatrix(pivotMatrix);
-
-                idx = idx + 1;
             }
         }
 
         transformAfter(blues, Math.floor((triCount + 1)/2));
         transformAfter(reds, Math.floor(triCount / 2));
-
-        triCount = triCount + 1;
     }
 }
 
@@ -184,6 +184,12 @@ function getPresetJSON() {
             },
             "Cross": {
                 "0": genAngles("20220202202000220002022")
+            },
+            "Cobra": {
+                "0": genAngles("01013211231030000200002")
+            },
+            "Coronet": {
+                "0": genAngles("00110033001100330011003")
             }
         },
         folders: {}
@@ -191,27 +197,28 @@ function getPresetJSON() {
 }
 
 // Build GUI controls
-let gui = new dat.GUI({ load: getPresetJSON(), preset: 'Default'});
-gui.remember(currentAngles);
+(function buildGUI() {
+    let gui = new dat.GUI({load: getPresetJSON(), preset: 'Default'});
+    gui.remember(currentAngles);
 
-gui.add(controls, "autoRotate");
-gui.add(window, "animateBuild");
+    gui.add(controls, "autoRotate");
+    gui.add(window, "animateBuild");
 
-function colorChange(material, newColor) {
-    material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
-}
+    function colorChange(material, newColor) {
+        material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
+    }
 
-let colorHolder = {"color1": {"r": 0x15, "g": 0x62, "b": 0x89},
-                   "color2": {"r": 0xFF, "g": 0x00, "b": 0x00}};
-gui.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
-gui.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
+    let colorHolder = {"color1": {"r": 0x15, "g": 0x62, "b": 0x89},
+                       "color2": {"r": 0xFF, "g": 0x00, "b": 0x00}};
+    gui.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
+    gui.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
 
-count = 1;
-while(count < 24) {
-    gui.add(currentAngles, "angle" + count, -1 * PI, PI).step(PI/2).onChange(redrawSnake);
-    count = count + 1;
-}
+    for(let i = 1; i < 24; i++) {
+        gui.add(currentAngles, "angle" + i, -1 * PI, PI).step(PI/2).onChange(redrawSnake).listen();
+    }
+})();
 
+// Animate building the current shape step by step from the starting position
 let building = false;
 function animateBuild() {
     if(building) {
@@ -221,10 +228,8 @@ function animateBuild() {
     let animateGoal = Object.assign({}, currentAngles);
 
     // Reset to a straight line
-    count = 1;
-    while(count < 24) {
-        currentAngles["angle" + count] = 0;
-        count = count + 1;
+    for(let i = 1; i < 24; i++) {
+        currentAngles["angle" + i] = 0;
     }
 
     redrawSnake();
@@ -233,7 +238,7 @@ function animateBuild() {
 
 function buildHelper(goal, count) {
     while(currentAngles["angle" + count] == goal["angle" + count] && count <= 23) {
-        count = count + 1;
+        count++;
     }
     currentAngles["angle" + count] = goal["angle" + count];
 
@@ -248,12 +253,6 @@ function buildHelper(goal, count) {
 // Start the three js animation loop
 function animate() {
     requestAnimationFrame( animate );
-
-    // Updates controls when animating
-    for (var i in gui.__controllers) {
-        gui.__controllers[i].updateDisplay();
-    }
-
     controls.update();
     renderer.render( scene, camera );
 }
