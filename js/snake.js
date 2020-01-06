@@ -1,5 +1,5 @@
-const RAD2 = 1.41421356;
-const PI   = 3.14159265;
+const RAD2 = Math.SQRT2;
+const PI   = Math.PI;
 
 let scene = new THREE.Scene();
 
@@ -31,61 +31,51 @@ controls = new THREE.OrbitControls( camera, renderer.domElement );
 controls.target = new THREE.Vector3(6 * RAD2, 0, 0);
 
 // Build the Snake
-let blues = [];
-let reds = [];
+function buildBlocks(shape, material, offset) {
+    let extrudeSettings = {
+        steps: 2,
+        depth: 1,
+        bevelEnabled: false,
+    };
+    let blocks = [];
 
-let blueMaterial = new THREE.MeshPhongMaterial( { color: 0x156289, emissive: 0x072534, side: THREE.DoubleSide, flatShading: true } );
+    let geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    let mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(offset, 0, 0);
+    scene.add(mesh);
+    blocks.push(mesh);
+
+    let count = 1;
+    while(count < 12) {
+        let newMesh = mesh.clone();
+        newMesh.position.set(RAD2 * count + offset, 0, 0);
+        scene.add(newMesh);
+        blocks.push(newMesh);
+        count = count + 1;
+    }
+    return blocks;
+}
+
+let blueMaterial = new THREE.MeshPhongMaterial( { color: 0x156289,
+    emissive: 0x072534, side: THREE.DoubleSide, flatShading: true } );
 
 let shape = new THREE.Shape();
 shape.moveTo( 0,0 );
 shape.lineTo( RAD2, 0);
 shape.lineTo( RAD2 / 2, RAD2 / 2);
 shape.lineTo( 0, 0 );
+let blues = buildBlocks(shape, blueMaterial, 0);
 
-let extrudeSettings = {
-    steps: 2,
-    depth: 1,
-    bevelEnabled: false,
-};
-
-let geometry = new THREE.ExtrudeGeometry( shape, extrudeSettings );
-let mesh = new THREE.Mesh( geometry, blueMaterial );
-scene.add( mesh );
-blues.push(mesh);
-
-let count = 1;
-while(count < 12) {
-    let newMesh = mesh.clone();
-    newMesh.position.set(RAD2 * count, 0, 0);
-    scene.add(newMesh);
-    blues.push(newMesh);
-    count = count + 1;
-}
-
-let redMaterial = new THREE.MeshPhongMaterial( { color: 0xFF0000, emissive: 0x072534, side: THREE.DoubleSide, flatShading: true } );
+let redMaterial = new THREE.MeshPhongMaterial( { color: 0xFF0000,
+    emissive: 0x072534, side: THREE.DoubleSide, flatShading: true } );
 
 shape = new THREE.Shape();
 shape.moveTo( 0, RAD2 / 2 );
 shape.lineTo( RAD2, RAD2 / 2);
 shape.lineTo( RAD2 / 2, 0);
 shape.lineTo( 0, RAD2 / 2 );
+let reds = buildBlocks(shape, redMaterial, RAD2 / 2);
 
-geometry = new THREE.ExtrudeGeometry( shape, extrudeSettings );
-mesh = new THREE.Mesh( geometry, redMaterial );
-mesh.position.set(RAD2 / 2, 0, 0)
-scene.add( mesh );
-reds.push(mesh);
-
-count = 1;
-while(count < 12) {
-    let newMesh = mesh.clone();
-    newMesh.position.set(RAD2 * count + RAD2 / 2, 0, 0);
-    scene.add(newMesh);
-    reds.push(newMesh);
-    count = count + 1;
-}
-
-// TODO I think this is unecessary?
 function updateAllWorlds() {
     for(const t of blues) {
         t.updateMatrixWorld(true);
@@ -93,18 +83,6 @@ function updateAllWorlds() {
     for(const t of reds) {
         t.updateMatrixWorld(true);
     }
-}
-
-function animate() {
-    requestAnimationFrame( animate );
-
-    // Updates controls when animating
-    for (var i in gui.__controllers) {
-        gui.__controllers[i].updateDisplay();
-    }
-
-    controls.update();
-    renderer.render( scene, camera );
 }
 
 window.addEventListener('resize', function () {
@@ -132,10 +110,10 @@ let currentAngles = genAngles("00000000000000000000000");
 let oldAngles = [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0];
 function redrawSnake() {
     let rotationPoint = new THREE.Vector3(3 * RAD2 / 4, RAD2 / 4, 0.5);
-    updateAllWorlds();
 
     let triCount = 1;
     while(triCount < 24) {
+        // Without this, the world matrices don't get updated and the rotations are messed up
         updateAllWorlds();
         // If particular angle didn't change, don't rotate
         if(oldAngles[triCount] == currentAngles["angle" + triCount]) {
@@ -144,49 +122,42 @@ function redrawSnake() {
         }
 
         let mesh;
+        let rotationVector;
+
         if(triCount % 2 == 1) {
             mesh = blues[Math.floor(triCount / 2)];
+            rotationVector = new THREE.Vector3(RAD2 / 2, RAD2 / 2, 0);
         } else {
             mesh = reds[Math.floor(triCount / 2) - 1];
+            rotationVector = new THREE.Vector3(RAD2 / 2, -1 * RAD2 / 2, 0);
         }
-        let pivot_matrix = mesh.matrixWorld.clone();
-        let pivot_inv = new THREE.Matrix4().getInverse(pivot_matrix, false);
-        let desiredTransform;
-        if(triCount % 2 == 1) {
-            desiredTransform = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(RAD2 / 2, RAD2 / 2, 0), currentAngles["angle" + triCount] - oldAngles[triCount]);
-        } else {
-            desiredTransform = new THREE.Matrix4().makeRotationAxis(new THREE.Vector3(RAD2 / 2, -1 * RAD2 / 2, 0), currentAngles["angle" + triCount] - oldAngles[triCount]);
-        }
+
+        let pivotMatrix = mesh.matrixWorld.clone();
+        let invPivotMatrix = new THREE.Matrix4().getInverse(pivotMatrix, false);
+
+        let rotationAngle = currentAngles["angle" + triCount] - oldAngles[triCount];
+        let rotationMatrix = new THREE.Matrix4().makeRotationAxis(rotationVector, rotationAngle);
         oldAngles[triCount] = currentAngles["angle" + triCount];
 
-        count = Math.floor((triCount + 1)/ 2);
-        while(count < 12) {
-            let todo = blues[count];
-            todo.applyMatrix(pivot_inv);
-            todo.position.sub(rotationPoint);
-            todo.applyMatrix(desiredTransform);
-            todo.position.add(rotationPoint);
-            todo.applyMatrix(pivot_matrix);
+        function transformAfter(list, idx) {
+            while(idx < 12) {
+                let block = list[idx];
+                block.applyMatrix(invPivotMatrix);
+                block.position.sub(rotationPoint);
+                block.applyMatrix(rotationMatrix);
+                block.position.add(rotationPoint);
+                block.applyMatrix(pivotMatrix);
 
-            count = count + 1;
+                idx = idx + 1;
+            }
         }
-        count = Math.floor(triCount / 2);
-        while(count < 12) {
-            let todo = reds[count];
-            todo.applyMatrix(pivot_inv);
-            todo.position.sub(rotationPoint);
-            todo.applyMatrix(desiredTransform);
-            todo.position.add(rotationPoint);
-            todo.applyMatrix(pivot_matrix);
 
-            count = count + 1;
-        }
+        transformAfter(blues, Math.floor((triCount + 1)/2));
+        transformAfter(reds, Math.floor(triCount / 2));
+
         triCount = triCount + 1;
     }
 }
-
-let gui = new dat.GUI({ load: getPresetJSON(), preset: 'Default'});
-gui.remember(currentAngles);
 
 function getPresetJSON() {
     return {
@@ -210,11 +181,30 @@ function getPresetJSON() {
             },
             "Ball": {
                 "0": genAngles("13133131131331311313313")
+            },
+            "Cross": {
+                "0": genAngles("20220202202000220002022")
             }
         },
         folders: {}
     };
 }
+
+// Build GUI controls
+let gui = new dat.GUI({ load: getPresetJSON(), preset: 'Default'});
+gui.remember(currentAngles);
+
+gui.add(controls, "autoRotate");
+gui.add(window, "animateBuild");
+
+function colorChange(material, newColor) {
+    material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
+}
+
+let colorHolder = {"color1": {"r": 0x15, "g": 0x62, "b": 0x89},
+                   "color2": {"r": 0xFF, "g": 0x00, "b": 0x00}};
+gui.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
+gui.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
 
 count = 1;
 while(count < 24) {
@@ -222,16 +212,12 @@ while(count < 24) {
     count = count + 1;
 }
 
-function colorChange(material, newColor) {
-    material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
-}
-
-gui.add(controls, "autoRotate");
-let colorHolder = {"color1": {"r": 0x15, "g": 0x62, "b": 0x89}, "color2": {"r": 0xFF, "g": 0, "b": 0}};
-gui.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
-gui.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
-
-function buildAnimate() {
+let building = false;
+function animateBuild() {
+    if(building) {
+        return;
+    }
+    building = true;
     let animateGoal = Object.assign({}, currentAngles);
 
     // Reset to a straight line
@@ -242,10 +228,10 @@ function buildAnimate() {
     }
 
     redrawSnake();
-    setTimeout(animateHelper.bind(null, animateGoal, 1), 300);
+    setTimeout(buildHelper.bind(null, animateGoal, 1), 300);
 }
 
-function animateHelper(goal, count) {
+function buildHelper(goal, count) {
     while(currentAngles["angle" + count] == goal["angle" + count] && count <= 23) {
         count = count + 1;
     }
@@ -253,8 +239,22 @@ function animateHelper(goal, count) {
 
     redrawSnake();
     if(count < 23) {
-        setTimeout(animateHelper.bind(null, goal, count + 1), 300);
+        setTimeout(buildHelper.bind(null, goal, count + 1), 300);
+    } else {
+        building = false;
     }
 }
 
+// Start the three js animation loop
+function animate() {
+    requestAnimationFrame( animate );
+
+    // Updates controls when animating
+    for (var i in gui.__controllers) {
+        gui.__controllers[i].updateDisplay();
+    }
+
+    controls.update();
+    renderer.render( scene, camera );
+}
 animate();
