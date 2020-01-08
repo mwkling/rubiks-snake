@@ -39,6 +39,19 @@ window.addEventListener('resize', function () {
     scene.add( lights[ 2 ] );
 })();
 
+// Setup audio
+var listener = new THREE.AudioListener();
+camera.add( listener );
+
+var sound = new THREE.Audio( listener );
+var audioLoader = new THREE.AudioLoader();
+audioLoader.load( 'click.wav', function( buffer ) {
+    sound.setBuffer( buffer );
+    sound.setVolume( 0.5 );
+});
+
+playSound = true;
+
 // Build the Snake
 function buildBlocks(shape, material, offset) {
     let extrudeSettings = {
@@ -122,6 +135,10 @@ function redrawSnake() {
             continue;
         }
 
+        if(playSound) {
+            sound.play();
+        }
+
         let mesh;
         let rotationVector;
 
@@ -203,6 +220,7 @@ function getPresetJSON() {
 
     gui.add(controls, "autoRotate");
     gui.add(window, "animateBuild");
+    gui.add(window, "playSound");
 
     function colorChange(material, newColor) {
         material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
@@ -233,7 +251,7 @@ function animateBuild() {
     }
 
     redrawSnake();
-    setTimeout(buildHelper.bind(null, animateGoal, 1), 300);
+    setTimeout(buildHelper.bind(null, animateGoal, 1), 500);
 }
 
 function buildHelper(goal, count) {
@@ -244,7 +262,7 @@ function buildHelper(goal, count) {
 
     redrawSnake();
     if(count < 23) {
-        setTimeout(buildHelper.bind(null, goal, count + 1), 300);
+        setTimeout(buildHelper.bind(null, goal, count + 1), 500);
     } else {
         building = false;
     }
