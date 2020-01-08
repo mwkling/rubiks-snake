@@ -5,12 +5,12 @@ let scene = new THREE.Scene();
 
 // Setup camera, renderer, controls
 let camera = new THREE.PerspectiveCamera( 75, window.innerWidth / window.innerHeight, 0.1, 1000 );
-camera.position.z = 15;
+camera.position.z = 20;
 camera.position.y = 0;
 camera.position.x = 6 * RAD2;
 
 let renderer = new THREE.WebGLRenderer();
-renderer.setSize( window.innerWidth, window.innerHeight );
+renderer.setSize( window.innerWidth, window.innerHeight - 5 );
 document.body.appendChild( renderer.domElement );
 
 let controls = new THREE.OrbitControls( camera, renderer.domElement );
@@ -20,7 +20,7 @@ controls.target = new THREE.Vector3(6 * RAD2, 0, 0);
 window.addEventListener('resize', function () {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.setSize( window.innerWidth, window.innerHeight - 5 );
 }, false );
 
 // Add lights
@@ -218,9 +218,11 @@ function getPresetJSON() {
     let gui = new dat.GUI({load: getPresetJSON(), preset: 'Default'});
     gui.remember(currentAngles);
 
-    gui.add(controls, "autoRotate");
-    gui.add(window, "animateBuild");
-    gui.add(window, "playSound");
+    let f1 = gui.addFolder("Basic Controls");
+
+    f1.add(controls, "autoRotate");
+    f1.add(window, "clickToAnimate");
+    f1.add(window, "playSound");
 
     function colorChange(material, newColor) {
         material.color.setRGB(newColor.r/256, newColor.g/256, newColor.b/256);
@@ -228,17 +230,19 @@ function getPresetJSON() {
 
     let colorHolder = {"color1": {"r": 0x15, "g": 0x62, "b": 0x89},
                        "color2": {"r": 0xFF, "g": 0x00, "b": 0x00}};
-    gui.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
-    gui.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
+    f1.addColor(colorHolder, "color1").onChange(colorChange.bind(null, blueMaterial));
+    f1.addColor(colorHolder, "color2").onChange(colorChange.bind(null, redMaterial));
+    f1.open();
 
+    let f2 = gui.addFolder("Angle Controls");
     for(let i = 1; i < 24; i++) {
-        gui.add(currentAngles, "angle" + i, -1 * PI, PI).step(PI/2).onChange(redrawSnake).listen();
+        f2.add(currentAngles, "angle" + i, -1 * PI, PI).step(PI/2).onChange(redrawSnake).listen();
     }
 })();
 
 // Animate building the current shape step by step from the starting position
 let building = false;
-function animateBuild() {
+function clickToAnimate() {
     if(building) {
         return;
     }
